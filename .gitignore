@@ -1,0 +1,29 @@
+# Environment configuration & secrets
+.env
+.env.local
+*.env
+
+# Python virtual environment & cache
+.venv/
+env/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Operating System & IDE artifacts
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker volume mounts (if local)
+postgres_data/
+
+# Test / build output
+*.log
