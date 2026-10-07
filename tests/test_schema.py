@@ -6,7 +6,7 @@ from psycopg import errors
 # Helper fixtures / seed factories for schema testing
 # ==============================================================================
 
-def create_base_port(cur, unlocode="INNSA", name="Nhava Sheva", country="IN"):
+def create_base_port(cur, unlocode="TSTNA", name="Test Nhava Sheva", country="IN"):
     cur.execute("""
         INSERT INTO port (unlocode, name, country_code, data_origin)
         VALUES (%s, %s, %s, 'REAL')
@@ -14,7 +14,7 @@ def create_base_port(cur, unlocode="INNSA", name="Nhava Sheva", country="IN"):
     """, (unlocode, name, country))
     return cur.fetchone()[0]
 
-def create_base_category(cur, code="GEN", name="General Cargo"):
+def create_base_category(cur, code="TSTGEN", name="Test General Cargo"):
     cur.execute("""
         INSERT INTO cargo_category (code, name, is_dangerous, is_perishable)
         VALUES (%s, %s, FALSE, FALSE)
@@ -22,7 +22,7 @@ def create_base_category(cur, code="GEN", name="General Cargo"):
     """, (code, name))
     return cur.fetchone()[0]
 
-def create_base_user(cur, email="trader1@example.com", name="Trader One"):
+def create_base_user(cur, email="trader_schema_test@example.com", name="Trader Schema"):
     cur.execute("""
         INSERT INTO app_user (email, full_name)
         VALUES (%s, %s)
@@ -32,29 +32,29 @@ def create_base_user(cur, email="trader1@example.com", name="Trader One"):
 
 def create_base_trader(cur, user_id=None):
     if user_id is None:
-        user_id = create_base_user(cur, "trader_owner@example.com", "Owner")
+        user_id = create_base_user(cur, "trader_owner_test@example.com", "Owner")
     cur.execute("""
         INSERT INTO trader (app_user_id, company_name, home_city, data_origin)
-        VALUES (%s, 'Apex Exports', 'Mumbai', 'SYNTHETIC')
+        VALUES (%s, 'Test Schema Apex Exports', 'Mumbai', 'SYNTHETIC')
         RETURNING id;
     """, (user_id,))
     return cur.fetchone()[0]
 
 def create_base_provider(cur, user_id=None):
     if user_id is None:
-        user_id = create_base_user(cur, "provider_owner@example.com", "Provider")
+        user_id = create_base_user(cur, "provider_owner_test@example.com", "Provider")
     cur.execute("""
         INSERT INTO provider (app_user_id, company_name, data_origin)
-        VALUES (%s, 'Global Ocean Freight', 'SYNTHETIC')
+        VALUES (%s, 'Test Schema Global Ocean Freight', 'SYNTHETIC')
         RETURNING id;
     """, (user_id,))
     return cur.fetchone()[0]
 
 def create_base_service(cur, provider_id=None, origin_id=None, dest_id=None):
     if origin_id is None:
-        origin_id = create_base_port(cur, "INNSA", "Nhava Sheva")
+        origin_id = create_base_port(cur, "TSTNA", "Test Nhava Sheva")
     if dest_id is None:
-        dest_id = create_base_port(cur, "SGSIN", "Singapore", "SG")
+        dest_id = create_base_port(cur, "TSTSG", "Test Singapore", "SG")
     if provider_id is None:
         provider_id = create_base_provider(cur)
     cur.execute("""
@@ -69,16 +69,16 @@ def create_base_service(cur, provider_id=None, origin_id=None, dest_id=None):
 # ==============================================================================
 
 def test_valid_port_insert(db_cursor):
-    port_id = create_base_port(db_cursor, "INNSA", "Nhava Sheva", "IN")
+    port_id = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva", "IN")
     assert port_id is not None
     db_cursor.execute("SELECT unlocode, name, country_code FROM port WHERE id = %s;", (port_id,))
     row = db_cursor.fetchone()
-    assert row == ("INNSA", "Nhava Sheva", "IN")
+    assert row == ("TSTNA", "Test Nhava Sheva", "IN")
 
 def test_duplicate_unlocode_fails(db_cursor):
-    create_base_port(db_cursor, "INNSA", "Port One", "IN")
+    create_base_port(db_cursor, "TSTNA", "Port One", "IN")
     with pytest.raises(errors.UniqueViolation) as exc:
-        create_base_port(db_cursor, "INNSA", "Port Two", "IN")
+        create_base_port(db_cursor, "TSTNA", "Port Two", "IN")
     assert exc.value.sqlstate == "23505"
     assert "port_unlocode_uk" in str(exc.value)
 
@@ -94,9 +94,9 @@ def test_malformed_unlocode_fails(db_cursor, bad_code):
 # ==============================================================================
 
 def test_duplicate_email_case_insensitive_fails(db_cursor):
-    create_base_user(db_cursor, "trader@example.com", "Trader Lower")
+    create_base_user(db_cursor, "trader_schema@example.com", "Trader Lower")
     with pytest.raises(errors.UniqueViolation) as exc:
-        create_base_user(db_cursor, "TRADER@EXAMPLE.COM", "Trader Upper")
+        create_base_user(db_cursor, "TRADER_SCHEMA@EXAMPLE.COM", "Trader Upper")
     assert exc.value.sqlstate == "23505"
     assert "app_user_email_uk" in str(exc.value)
 
@@ -106,8 +106,8 @@ def test_duplicate_email_case_insensitive_fails(db_cursor):
 
 def test_valid_shipment_insert(db_cursor):
     t_id = create_base_trader(db_cursor)
-    p_orig = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
-    p_dest = create_base_port(db_cursor, "SGSIN", "Singapore", "SG")
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
     c_id = create_base_category(db_cursor)
 
     db_cursor.execute("""
@@ -120,8 +120,8 @@ def test_valid_shipment_insert(db_cursor):
 @pytest.mark.parametrize("bad_weight", [0, -10.5])
 def test_shipment_weight_zero_or_negative_fails(db_cursor, bad_weight):
     t_id = create_base_trader(db_cursor)
-    p_orig = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
-    p_dest = create_base_port(db_cursor, "SGSIN", "Singapore", "SG")
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
     c_id = create_base_category(db_cursor)
 
     with pytest.raises(errors.CheckViolation) as exc:
@@ -135,8 +135,8 @@ def test_shipment_weight_zero_or_negative_fails(db_cursor, bad_weight):
 @pytest.mark.parametrize("bad_cbm", [0, -5.0, 71.0])
 def test_shipment_cbm_bounds_fails(db_cursor, bad_cbm):
     t_id = create_base_trader(db_cursor)
-    p_orig = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
-    p_dest = create_base_port(db_cursor, "SGSIN", "Singapore", "SG")
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
     c_id = create_base_category(db_cursor)
 
     with pytest.raises(errors.CheckViolation) as exc:
@@ -152,7 +152,7 @@ def test_shipment_cbm_bounds_fails(db_cursor, bad_cbm):
 # ==============================================================================
 
 def test_service_origin_equals_destination_fails(db_cursor):
-    p_id = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
+    p_id = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
     prv_id = create_base_provider(db_cursor)
     with pytest.raises(errors.CheckViolation) as exc:
         db_cursor.execute("""
@@ -230,9 +230,9 @@ def test_adjacent_rate_periods_same_service_succeeds(db_cursor):
     assert db_cursor.fetchone()[0] == 2
 
 def test_same_rate_period_on_different_services_succeeds(db_cursor):
-    p_orig = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
-    p_dest1 = create_base_port(db_cursor, "SGSIN", "Singapore", "SG")
-    p_dest2 = create_base_port(db_cursor, "MYPKG", "Port Klang", "MY")
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest1 = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
+    p_dest2 = create_base_port(db_cursor, "TSTMY", "Test Port Klang", "MY")
     prv_id = create_base_provider(db_cursor)
 
     srv1 = create_base_service(db_cursor, prv_id, p_orig, p_dest1)
@@ -275,8 +275,51 @@ def test_null_in_mandatory_column_fails(db_cursor):
 
 def test_second_capacity_holding_booking_fails(db_cursor):
     t_id = create_base_trader(db_cursor)
-    p_orig = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
-    p_dest = create_base_port(db_cursor, "SGSIN", "Singapore", "SG")
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
+    c_id = create_base_category(db_cursor)
+
+    db_cursor.execute("""
+        INSERT INTO shipment (trader_id, origin_port_id, dest_port_id, category_id, cbm, weight_kg, cargo_ready_date)
+        VALUES (%s, %s, %s, %s, 10.0, 2000.0, '2026-10-15')
+        RETURNING id;
+    """, (t_id, p_orig, p_dest, c_id))
+    sh_id = db_cursor.fetchone()[0]
+
+    srv_id = create_base_service(db_cursor, origin_id=p_orig, dest_id=p_dest)
+    db_cursor.execute("""
+        INSERT INTO departure (service_id, etd, eta, cutoff_at, capacity_cbm, capacity_weight_kg)
+        VALUES (%s, '2026-10-20 10:00:00+00', '2026-10-25 10:00:00+00', '2026-10-18 10:00:00+00', 60.0, 25000.0)
+        RETURNING id;
+    """, (srv_id,))
+    dep1 = db_cursor.fetchone()[0]
+
+    db_cursor.execute("""
+        INSERT INTO departure (service_id, etd, eta, cutoff_at, capacity_cbm, capacity_weight_kg)
+        VALUES (%s, '2026-10-28 10:00:00+00', '2026-11-02 10:00:00+00', '2026-10-26 10:00:00+00', 60.0, 25000.0)
+        RETURNING id;
+    """, (srv_id,))
+    dep2 = db_cursor.fetchone()[0]
+
+    # First booking: PENDING
+    db_cursor.execute("""
+        INSERT INTO booking (shipment_id, departure_id, status, allocated_cbm, allocated_weight_kg, chargeable_qty, quoted_rate, quoted_currency, quoted_total)
+        VALUES (%s, %s, 'PENDING', 10.0, 2000.0, 10.0, 80.0, 'USD', 800.0);
+    """, (sh_id, dep1))
+
+    # Second booking: CONFIRMED on dep2 for same shipment must fail
+    with pytest.raises(errors.UniqueViolation) as exc:
+        db_cursor.execute("""
+            INSERT INTO booking (shipment_id, departure_id, status, allocated_cbm, allocated_weight_kg, chargeable_qty, quoted_rate, quoted_currency, quoted_total)
+            VALUES (%s, %s, 'CONFIRMED', 10.0, 2000.0, 10.0, 80.0, 'USD', 800.0);
+        """, (sh_id, dep2))
+    assert exc.value.sqlstate == "23505"
+    assert "booking_shipment_capacity_uk" in str(exc.value)
+
+def test_cancelled_booking_permits_new_capacity_holding_booking(db_cursor):
+    t_id = create_base_trader(db_cursor)
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
     c_id = create_base_category(db_cursor)
 
     db_cursor.execute("""
