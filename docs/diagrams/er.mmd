@@ -1,0 +1,131 @@
+erDiagram
+    APP_USER ||--o| PROVIDER : "identifies (1:1)"
+    APP_USER ||--o| TRADER : "identifies (1:1)"
+    
+    PROVIDER ||--o{ LCL_SERVICE : "operates"
+    PORT ||--o{ LCL_SERVICE : "originates"
+    PORT ||--o{ LCL_SERVICE : "terminates"
+    
+    LCL_SERVICE ||--o{ SERVICE_CARGO_ACCEPTANCE : "specifies"
+    CARGO_CATEGORY ||--o{ SERVICE_CARGO_ACCEPTANCE : "accepted_by"
+    
+    LCL_SERVICE ||--o{ DEPARTURE : "schedules"
+    LCL_SERVICE ||--o{ RATE : "prices"
+    
+    TRADER ||--o{ SHIPMENT : "submits"
+    PORT ||--o{ SHIPMENT : "originates"
+    PORT ||--o{ SHIPMENT : "terminates"
+    CARGO_CATEGORY ||--o{ SHIPMENT : "classifies"
+    
+    SHIPMENT ||--o{ BOOKING : "allocates"
+    DEPARTURE ||--o{ BOOKING : "holds_capacity_on"
+    
+    BOOKING ||--o{ BOOKING_AUDIT : "audited_by"
+
+    PORT {
+        bigint id PK
+        text unlocode UK
+        text name
+        char(2) country_code
+        text data_origin
+    }
+
+    CARGO_CATEGORY {
+        bigint id PK
+        text code UK
+        text name
+        boolean is_dangerous
+        boolean is_perishable
+    }
+
+    APP_USER {
+        bigint id PK
+        citext email UK
+        text full_name
+        timestamptz created_at
+    }
+
+    PROVIDER {
+        bigint id PK
+        bigint app_user_id FK,UK
+        text company_name UK
+        text data_origin
+    }
+
+    TRADER {
+        bigint id PK
+        bigint app_user_id FK,UK
+        text company_name
+        text home_city
+        text data_origin
+    }
+
+    LCL_SERVICE {
+        bigint id PK
+        bigint provider_id FK
+        bigint origin_port_id FK
+        bigint dest_port_id FK
+        integer transit_days
+        boolean is_active
+    }
+
+    SERVICE_CARGO_ACCEPTANCE {
+        bigint service_id PK,FK
+        bigint category_id PK,FK
+    }
+
+    DEPARTURE {
+        bigint id PK
+        bigint service_id FK
+        timestamptz etd
+        timestamptz eta
+        timestamptz cutoff_at
+        numeric capacity_cbm
+        numeric capacity_weight_kg
+        text status
+    }
+
+    RATE {
+        bigint id PK
+        bigint service_id FK
+        numeric rate_per_wm
+        char(3) currency
+        daterange validity
+    }
+
+    SHIPMENT {
+        bigint id PK
+        bigint trader_id FK
+        bigint origin_port_id FK
+        bigint dest_port_id FK
+        bigint category_id FK
+        numeric cbm
+        numeric weight_kg
+        date cargo_ready_date
+        text description
+    }
+
+    BOOKING {
+        bigint id PK
+        bigint shipment_id FK
+        bigint departure_id FK
+        text status
+        numeric allocated_cbm
+        numeric allocated_weight_kg
+        numeric chargeable_qty
+        numeric quoted_rate
+        char(3) quoted_currency
+        numeric quoted_total
+        text notes
+        timestamptz created_at
+        timestamptz updated_at
+    }
+
+    BOOKING_AUDIT {
+        bigint id PK
+        bigint booking_id FK
+        text old_status
+        text new_status
+        timestamptz changed_at
+        text changed_by
+    }
