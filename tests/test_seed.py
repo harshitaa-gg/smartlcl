@@ -12,14 +12,26 @@ from pathlib import Path
 
 @pytest.fixture(autouse=True, scope="module")
 def ensure_seeds_applied(db_conn_params):
-    """Ensure seeds are applied for seed tests, and clean table data on teardown."""
+    """Ensure Sprint 2 seeds (001-003) are applied for seed tests, and clean table data on teardown."""
     conn = psycopg.connect(**db_conn_params)
     try:
         with conn.cursor() as cur:
+            # Clean any pre-existing bookings/seeds first so test_seed tests pure Sprint 2 state
+            cur.execute("""
+                TRUNCATE TABLE 
+                    booking_audit, booking, shipment, rate, departure,
+                    service_cargo_acceptance, lcl_service, trader, provider,
+                    cargo_category, app_user, port
+                CASCADE;
+            """)
             seeds_dir = Path(__file__).resolve().parent.parent / "db" / "seeds"
-            for sfile in sorted(seeds_dir.glob("*.sql")):
-                with open(sfile, "r", encoding="utf-8") as f:
-                    cur.execute(f.read())
+            # In Sprint 2, only reference, synthetic actors, and operations were seeded (no bookings)
+            sprint2_seeds = ["001_reference_real.sql", "002_synthetic_actors.sql", "003_synthetic_operations.sql"]
+            for sname in sprint2_seeds:
+                sfile = seeds_dir / sname
+                if sfile.exists():
+                    with open(sfile, "r", encoding="utf-8") as f:
+                        cur.execute(f.read())
             conn.commit()
     finally:
         conn.close()
@@ -292,7 +304,7 @@ def test_seed_zero_bookings(db_conn):
 def test_seed_idempotency_double_run(db_conn):
     """Running all seed scripts a second time must produce identical row counts."""
     seeds_dir = Path(__file__).resolve().parent.parent / "db" / "seeds"
-    seed_files = sorted(seeds_dir.glob("*.sql"))
+    sprint2_seeds = ["001_reference_real.sql", "002_synthetic_actors.sql", "003_synthetic_operations.sql"]
 
     with db_conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) FROM port;")
@@ -304,10 +316,12 @@ def test_seed_idempotency_double_run(db_conn):
         cur.execute("SELECT COUNT(*) FROM departure;")
         departure_count_before = cur.fetchone()[0]
 
-        # Re-execute all seeds
-        for sfile in seed_files:
-            with open(sfile, "r", encoding="utf-8") as f:
-                cur.execute(f.read())
+        # Re-execute seeds
+        for sname in sprint2_seeds:
+            sfile = seeds_dir / sname
+            if sfile.exists():
+                with open(sfile, "r", encoding="utf-8") as f:
+                    cur.execute(f.read())
 
         cur.execute("SELECT COUNT(*) FROM port;")
         assert cur.fetchone()[0] == port_count_before, "Port count changed after re-running seed"

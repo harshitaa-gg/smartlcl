@@ -361,8 +361,8 @@ def test_cancelled_booking_permits_new_capacity_holding_booking(db_cursor):
 
 def test_cancelled_booking_permits_new_capacity_holding_booking(db_cursor):
     t_id = create_base_trader(db_cursor)
-    p_orig = create_base_port(db_cursor, "INNSA", "Nhava Sheva")
-    p_dest = create_base_port(db_cursor, "SGSIN", "Singapore", "SG")
+    p_orig = create_base_port(db_cursor, "TSTNA", "Test Nhava Sheva")
+    p_dest = create_base_port(db_cursor, "TSTSG", "Test Singapore", "SG")
     c_id = create_base_category(db_cursor)
 
     db_cursor.execute("""
